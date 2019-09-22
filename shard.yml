@@ -1,0 +1,23 @@
+name: file-index
+version: 0.1.0
+
+authors:
+  - Paul M. Lambert <plambert@plambert.net>
+
+targets:
+  file-index:
+    main: src/file-index.cr
+  file-index-dbinit:
+    main: src/file-index-dbinit.cr
+  file-index-test:
+    main: src/file-index-test.cr
+
+crystal: 0.30.1
+
+license: MIT
+
+dependencies:
+  sqlite3:
+    github: crystal-lang/crystal-sqlite3
+  granite:
+    github: amberframework/granite
