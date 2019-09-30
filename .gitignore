@@ -3,6 +3,6 @@
 /bin/
 /.shards/
 *.dwarf
-/test-files/
 *.out
 *.sqlite3
+/test-*/
