@@ -4,7 +4,7 @@ require "db"
 require "sqlite3"
 require "json"
 
-class File::Entry
+class File::Index::Entry
   @@properties = %w{hostname dir name dev inode size permissions filetype flags mtime uid owner gid group created_at updated_at}
   @@hostname = System.hostname
   property id : Int64?
@@ -61,7 +61,7 @@ class File::Entry
   def self.new_from_filesystem(db : DB::Database, path : Path | String, hostname : String = @@hostname) : self
     STDERR.puts "new_from_filesystem(#{path.inspect})" if ENV["FILE_INDEX_DEBUG"]?
     path = File.real_path File.expand_path path.to_s
-    new_entry : File::Entry
+    new_entry : File::Index::Entry
     begin
       new_entry = self.by_path(db, path, hostname)
       STDERR.puts "  found: #{new_entry.inspect}" if ENV["FILE_INDEX_DEBUG"]?

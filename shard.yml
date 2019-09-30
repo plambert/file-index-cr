@@ -7,8 +7,6 @@ authors:
 targets:
   file-index:
     main: src/file-index.cr
-  file-index-dbinit:
-    main: src/file-index-dbinit.cr
   file-index-test:
     main: src/file-index-test.cr
 

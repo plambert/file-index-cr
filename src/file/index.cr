@@ -14,7 +14,7 @@ class File
     end
 
     def by_id(id : Int)
-      File::Entry.by_id(id: id, db: @db)
+      File::Index::Entry.by_id(id: id, db: @db)
     end
 
     def add(path : Path)
@@ -22,12 +22,12 @@ class File
     end
 
     def add(path : String)
-      entries = [] of File::Entry
+      entries = [] of File::Index::Entry
       queue = Deque(String).new(1000)
       queue.push path
       while queue.size > 0
         path = queue.shift
-        entry = File::Entry.new_from_filesystem(@db, path)
+        entry = File::Index::Entry.new_from_filesystem(@db, path)
         entries << entry
         if entry.is_dir?
           Dir.children(path).each { |c| queue << "#{path}/#{c}" }
@@ -37,14 +37,14 @@ class File
     end
 
     def all
-      resultset = File::Entry.db_where(@db)
+      resultset = File::Index::Entry.db_where(@db)
       resultset.each do |result|
-        yield File::Entry.new_from_resultset(result)
+        yield File::Index::Entry.new_from_resultset(result)
       end
     end
 
     def all
-      File::Entry.find(@db)
+      File::Index::Entry.find(@db)
     end
 
     def self.create_db(dbfile : String | Path)
