@@ -22,7 +22,7 @@ class File
       @@io_for_level = {} of LogLevel => IO
       @@io_for_level[LogLevel::ERROR] = STDERR
       @@io_for_level[LogLevel::WARN] = STDERR
-      @@io_for_level[LogLevel::INFO] = STDOUT
+      @@io_for_level[LogLevel::INFO] = STDERR
       @@io_for_level[LogLevel::DEBUG] = STDERR
       @@io_for_level[LogLevel::TRACE] = STDERR
       # STDERR.puts typeof(@@io_for_level)
