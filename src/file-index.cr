@@ -1,12 +1,16 @@
 require "admiral"
 require "./file/**"
 
+File::Index::Logger.import
+
 class CLI < Admiral::Command
+  @@logger : File::Index::Logger = File::Index::Logger.instance
+
   define_version "1.0.0"
   define_help description: "Manage SQLite database index of file metadata"
   define_flag dbfile : String,
     description: "The database file to use",
-    default: Path["~/.cache/file-index-cr.sqlite3"].expand.to_s,
+    default: Path[ENV["FILE_INDEX_DBFILE"]? || "~/.cache/file-index-cr.sqlite3"].expand.to_s,
     long: dbfile,
     short: f,
     required: true
@@ -19,25 +23,29 @@ class CLI < Admiral::Command
 
   class Add < Admiral::Command
     define_help description: "Add or update files/directories in the file-index database"
+    define_flag checksum : Bool,
+      description: "Calculate file checksums",
+      default: false,
+      long: checksum,
+      short: c
 
     def run
       dbfile = parent.flags.as(CLI::Flags).dbfile
+      verbose = parent.flags.as(CLI::Flags).verbose
+      loglevel verbose ? File::Index::Logger::LogLevel::DEBUG : File::Index::Logger::LogLevel::INFO
       unless File.file? dbfile
-        STDERR.puts "\e[31;1m#{dbfile}: file-index database does not exist\e[0m"
-        STDERR.puts
-        STDERR.puts "Create it with:"
-        STDERR.puts "  #{PROGRAM_NAME} create --dbfile=#{dbfile}"
+        error "%s: file-index database does not exist, use \`%s create\` to create it" % [dbfile, PROGRAM_NAME]
         exit 1
       end
       index = File::Index.new dbfile: dbfile
 
       if arguments.size > 0
-        arguments.each { |a| index.add(a) }
+        arguments.each { |a| index.add(a, checksum: flags.checksum) }
       else
-        index.add(".")
+        index.add(".", checksum: flags.checksum)
       end
 
-      print "\e[34;1mCOMPLETED INDEXING\e[0m\n\n"
+      info "indexing complete"
 
       index.all.each do |entry|
         puts entry.to_json
@@ -53,10 +61,10 @@ class CLI < Admiral::Command
     def run
       dbfile = parent.flags.as(CLI::Flags).dbfile
       if File.exists?(dbfile)
-        STDERR.puts "#{dbfile}: cannot create, file exists"
+        fail 13, "%s: cannot create file, it already exists", dbfile
       else
         File::Index.create_db dbfile: dbfile
-        STDOUT.puts "#{dbfile}: empty index file created"
+        info "%s: empty index file created", dbfile
       end
     end
   end
@@ -70,6 +78,9 @@ class CLI < Admiral::Command
       dbfile = parent.flags.as(CLI::Flags).dbfile
       if File.file?(dbfile)
         File::Index.reset! dbfile: dbfile
+        info "%s: database reset", dbfile
+      else
+        error "%s: database file not found", dbfile
       end
     end
   end
