@@ -11,13 +11,14 @@ class File
 
     property dbfile : String
     property db : DB::Database
+    property queue : Channel(String) = Channel(String).new
 
     def initialize(dbfile = "~/.cache/file-index-cr.sqlite3")
       @dbfile = File.real_path File.expand_path dbfile.to_s
       @db = DB.open("sqlite3://#{@dbfile}")
     end
 
-    def by_id(id : Int)
+    def by_id(id : UInt64)
       File::Index::Entry.by_id(id: id, db: @db)
     end
 
@@ -32,13 +33,18 @@ class File
       queue.push path
       while queue.size > 0
         path = queue.shift
-        entry = File::Index::Entry.new_from_filesystem db: @db, path: path, checksum: checksum
+        entry = self.add_one db: @db, path: path, checksum: checksum
         entries << entry
         if entry.is_dir?
           Dir.children(path).each { |c| queue << "#{path}/#{c}" }
         end
       end
       entries
+    end
+
+    def add_one(path : String, checksum : Bool = false, hostname : String = @@hostname)
+      debug "add_one(#{path.inspect}, checksum: #{checksum.inspect}, hostname: #{hostname.inspect})"
+      File::Index::Entry.new_from_filesystem db: @db, path: path, checksum: checksum
     end
 
     def all

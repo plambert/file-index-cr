@@ -87,6 +87,16 @@ class CLI < Admiral::Command
 
   register_sub_command reset, Reset
 
+  class Schema < Admiral::Command
+    define_help description: "Output the SQL schema for the database (for development/debugging)"
+
+    def run
+      File::Index::SQL.schema.each { |stmt| puts stmt }
+    end
+  end
+
+  register_sub_command schema, Schema
+
   class Search < Admiral::Command
     define_help description: "Search the file-index database (NOT IMPLEMENTED)"
 

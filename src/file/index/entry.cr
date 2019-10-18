@@ -308,31 +308,35 @@ class File
 
       def calculate_checksums(force = false)
         if !self.filetype.nil? && self.filetype.as(File::Type).file?
-          info "calculate_checksums(force: #{force}) crc32=#{@crc32} sha256=#{@sha256} for #{self.path}"
+          debug "calculate_checksums(force: #{force}) crc32=#{@crc32} sha256=#{@sha256} for #{self.path}"
           if @sha256.nil? || @crc32.nil? || force
-            buffer_size = 4096
+            buffer_size = 32768
             buffer = Bytes.new(buffer_size)
             # crc32 = CRC32.initial
             crc32 = 0_u32
             size = self.size.as(Int64)
             path = self.path
+            last_time = Time.now
             File.open(path) do |input|
               io = OpenSSL::DigestIO.new(input, "SHA256")
-              bytes = 0
+              progress = 0_u64
               loop do
                 bytes = io.read(buffer)
                 break if bytes == 0
                 crc32 = CRC32.update(buffer[0, bytes], crc32)
-                bytes += buffer_size
-                if size > 128 * 1024 && 0 == bytes % (64 * buffer_size)
-                  STDERR.printf "\r%6.2f%% %s", 100.0 * bytes / size, path
+                progress += buffer_size
+                now = Time.now
+                if (size > 128 * 1024) && (now != last_time)
+                  STDERR.printf "\r%6.2f%% %s", 100.0 * progress / size, path
+                  STDERR.flush
+                  last_time = now
                 end
               end
               @sha256 = io.digest.hexstring
               STDERR.printf "\r\e[K"
             end
             @crc32 = "%08x" % crc32
-            info "crc32=#{@crc32} sha256=#{@sha256}"
+            debug "crc32=#{@crc32} sha256=#{@sha256}"
           end
         end
       end
