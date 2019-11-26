@@ -12,28 +12,54 @@ File::Index::Logger.import
 class File
   class Index
     class Entry
-      @@properties = %w{hostname dir name dev inode size permissions filetype flags mtime uid owner gid group created_at updated_at crc32 sha256 link_target}
-      @@hostname = System.hostname
+      class_property hostname : String = System.hostname
+      alias AnyValue = Nil | Int64 | String | Int32 | File::Permissions | File::Type | File::Flags | Time
+      alias FullRecord = NamedTuple(
+        id: Int64?,
+        hostname: String,
+        dir: String,
+        name: String,
+        dev: Int32,
+        inode: Int32,
+        size: Int64,
+        permissions: File::Permissions,
+        filetype: File::Type,
+        flags: File::Flags,
+        mtime: Time,
+        uid: Int32,
+        owner: String,
+        gid: Int32,
+        group: String,
+        created_at: Time,
+        updated_at: Time,
+        crc32: String?,
+        sha256: String?,
+        link_target: String?,
+      )
+      @@properties_required : Array(String) = %w{hostname dir name dev inode size permissions filetype flags mtime uid owner gid group created_at updated_at}
+      @@properties : Array(String) = @@properties_required + %w{crc32 sha256 link_target}
+      @@properties_all : Array(String) = %w{id} + @@properties
       property id : Int64?
       property hostname : String
       property dir : String
       property name : String
-      property dev : Int32?
-      property inode : Int32?
-      property size : Int64?
+      property dev : Int32
+      property inode : Int32
+      property size : Int64
       property permissions : File::Permissions
-      property filetype : File::Type?
-      property flags : File::Flags?
-      property mtime : Time?
-      property uid : Int32?
-      property owner : String?
-      property gid : Int32?
-      property group : String?
-      property created_at : Time?
-      property updated_at : Time?
+      property filetype : File::Type
+      property flags : File::Flags
+      property mtime : Time
+      property uid : Int32
+      property owner : String
+      property gid : Int32
+      property group : String
+      property created_at : Time
+      property updated_at : Time
       @crc32 : String? = nil
       @sha256 : String? = nil
       property link_target : String?
+      property info : File::Info?
 
       def initialize(
         @hostname,
@@ -67,93 +93,37 @@ class File
         end
       end
 
+      def local_info?(hostname : String = @@hostname)
+        self.local_info
+      rescue
+        nil
+      end
+
       def path
         Path.new(self.dir, self.name)
       end
 
-      def self.new_from_filesystem(db : DB::Database, path : Path | String, hostname : String = @@hostname, checksum : Bool = false) : self
-        debug "new_from_filesystem(#{path.inspect})"
-        if File.exists? path
-          path = File.real_path File.expand_path path.to_s
-        elsif File.exists? File.dirname(path)
-          path = sprintf "%s/%s", File.real_path(File.expand_path(File.dirname(path))), File.basename(path)
-          warn "%s: dangling symlink", path
-        else
-          raise "#{path}: parent directory does not exist"
-        end
-        new_entry : self
-        begin
-          new_entry = self.by_path(db, path, hostname)
-          debug "  found: #{new_entry.inspect}"
-          raise "no new entry" unless new_entry
-        rescue e
-          debug "  not found: creating new: #{e.inspect}"
-          info = File.info(path.to_s, follow_symlinks: false)
-          new_entry = self.new(
-            hostname: hostname,
-            dir: File.dirname(path),
-            name: File.basename(path),
-            dev: info.dev.to_i32,
-            inode: info.inode.to_i32,
-            size: info.size.to_i64,
-            mtime: info.modification_time,
-            permissions: info.permissions,
-            filetype: info.type,
-            flags: info.flags,
-            uid: info.owner.to_i32,
-            owner: self.username(info.owner),
-            gid: info.group.to_i32,
-            group: self.groupname(info.group),
-            updated_at: Time.utc,
-            created_at: Time.utc,
-            crc32: nil,
-            sha256: nil,
-            link_target: info.symlink? ? File.readlink(path) : nil,
-          )
-          debug "  new: #{new_entry.inspect}"
-        end
-        new_entry.calculate_checksums if checksum
-        new_entry.update(db)
-        new_entry
-      end
-
-      def self.groupname(gid)
-        System::Group.find_by(id: gid.to_s).name
-      rescue
-        "GID\##{gid}"
-      end
-
-      def self.username(uid)
-        System::User.find_by(id: uid.to_s).username
-      rescue
-        "UID\##{uid}"
-      end
-
-      def update_from_filesystem(db : DB::Database, hostname : String = @@hostname, checksum : Bool = false, checksum_if_changed : Bool = false)
+      def update_from_filesystem(db : DB::Database, hostname : String = @@hostname)
         debug "update_from_filesystem() - #{self.inspect}"
         info = self.local_info hostname: hostname
-        if (self.size != info.size) || (self.mtime != info.modification_time)
-          if checksum_if_changed
-            checksum = true
-          else
-            @sha256 = nil
-            @crc32 = nil
-          end
+        if self.is_modified?(info)
+          @sha256 = nil
+          @crc32 = nil
         end
-        self.dev = info.dev.to_i32
-        self.inode = info.inode
-        self.size = info.size.to_i64
-        self.permissions = info.permissions
-        self.filetype = info.type
-        self.flags = info.flags
-        self.mtime = info.modification_time
-        self.uid = info.owner
-        self.owner = System::User.find_by(id: info.owner.to_s).username
-        self.gid = info.group
-        self.group = System::Group.find_by(id: info.group.to_s).name
-        self.updated_at = Time.utc
-        self.created_at = self.updated_at if self.created_at.nil?
-        self.calculate_checksums force: true if checksum
+        @dev = info.dev.to_i32
+        @inode = info.inode
+        @size = info.size.to_i64
+        @permissions = info.permissions
+        @filetype = info.type
+        @flags = info.flags
+        @mtime = info.modification_time
+        @uid = info.owner
+        @owner = System::User.find_by(id: info.owner.to_s).username
+        @gid = info.group
+        @group = System::Group.find_by(id: info.group.to_s).name
+        @updated_at = Time.utc
+        @created_at = self.updated_at if self.created_at.nil?
+        @link_target=File.readlink(self.path.to_s) if info.symlink?
         self.update(db)
       end
 
@@ -170,18 +140,24 @@ class File
             @@properties.map { |p| "\"#{p}\"" }.join(", "),
             @@properties.map { |e| "?" }.join(", "),
           ]
-          result = db.exec(sql_command, @hostname, @dir, @name, @dev, @inode, @size, @permissions.value.to_i64,
-            @filetype.to_s, @flags.to_s, @mtime.as(Time).to_unix, @uid, @owner, @gid, @group, @created_at.as(Time).to_unix, @updated_at.as(Time).to_unix, @crc32, @sha256, @link_target)
+          begin
+            result = db.exec(sql_command, @hostname, @dir, @name, @dev, @inode, @size, @permissions.value.to_i64,
+              @filetype.to_s, @flags.to_s, @mtime.as(Time).to_unix, @uid, @owner, @gid, @group, @created_at.as(Time).to_unix, @updated_at.as(Time).to_unix, @crc32, @sha256, @link_target)
+          rescue e : SQLite3::Exception
+            fail 9, "INSERT failed:\n%s\n%s\n", self.inspect, e.to_s
+          end
           @id = result.last_insert_id.as(Int64)
         else
           sql_command = "UPDATE entry SET dev=?, inode=?, size=?, permissions=?, filetype=?, flags=?, mtime=?, uid=?, owner=?, gid=?, \"group\"=?, updated_at=?, crc32=?, sha256=?, link_target=? WHERE id=?;"
           result = db.exec(sql_command, @dev, @inode, @size, @permissions.value.to_i64, @filetype.to_s,
-            @flags.to_s, @mtime.as(Time).to_unix, @uid, @owner, @gid, @group, @updated_at.as(Time).to_unix, @crc32, @sha256, @link_target)
+            @flags.to_s, @mtime.as(Time).to_unix, @uid, @owner, @gid, @group, @updated_at.as(Time).to_unix, @crc32, @sha256, @link_target,
+            @id)
         end
         self
       end
 
       def self.from_resultset(result)
+        record = {} of String => Int64 | String | Int32 | File::Permissions | File::Type | File::Flags | Time | Nil
         begin
           fields = {
             id:          result.read(Int64),
@@ -210,62 +186,30 @@ class File
         self.new(**fields)
       end
 
-      def self.find(db : DB::Database, where : String? = nil, *args)
-        debug "find(#{where}, #{args}) do ... end"
-        sql_command = String.build do |str|
-          str << "SELECT \"id\", #{@@properties.map { |p| "\"#{p}\"" }.join(", ")} FROM entry"
-          unless where.nil?
-            str << " WHERE #{where}"
-          end
-          str << " ORDER BY hostname, dir, name;"
-        end
-        debug "SQL: %s", sql_command
-        db.query(sql_command, *args) do |rs|
-          rs.each do
-            yield self.from_resultset(rs).as(self)
-          end
+      def directory?
+        if self.filetype
+          self.filetype.directory?
+        elsif self.hostname == @@hostname
+          File.directory?(self.path)
+        else
+          false
         end
       end
 
-      def self.find(db : DB::Database, where : String? = nil, *args)
-        debug "find(#{where}, #{args})"
-        sql_command = String.build do |str|
-          str << "SELECT \"id\", #{@@properties.map { |p| "\"#{p}\"" }.join(", ")} FROM entry"
-          unless where.nil?
-            str << " WHERE #{where}"
-          end
-          str << " ORDER BY hostname, dir, name;"
+      def file?
+        if self.filetype
+          self.filetype.file?
+        elsif self.hostname == @@hostname
+          File.file?(self.path)
+        else
+          false
         end
-        debug "SQL %s", sql_command
-        list = [] of self
-        db.query(sql_command, *args) do |rs|
-          rs.each do
-            list.push self.from_resultset(rs).as(self)
-          end
+      end
+
+      def to_json
+        String.build do |str|
+          to_json str
         end
-        list
-      end
-
-      def self.find_one(db : DB::Database, where : String, *args)
-        debug "find_one(#{where.inspect}, #{args})"
-        result = self.find(db, where, *args)
-        result.first
-      end
-
-      def self.by_id(id : Int, db : DB::Database)
-        debug "by_id(#{id.inspect})"
-        self.find_one(db, "id=?", id)
-      end
-
-      def self.by_path(db : DB::Database, path : Path | String, hostname : String = @@hostname)
-        debug "by_path(#{path.inspect}, #{hostname.inspect})"
-        dirname = File.dirname path.to_s
-        basename = File.basename path.to_s
-        self.find_one(db, "hostname=? AND dir=? AND name=?", hostname, dirname, basename)
-      end
-
-      def is_dir?
-        File.directory?(self.path)
       end
 
       def to_json(io : IO)
@@ -306,58 +250,146 @@ class File
         end
       end
 
-      def calculate_checksums(force = false)
-        if !self.filetype.nil? && self.filetype.as(File::Type).file?
-          debug "calculate_checksums(force: #{force}) crc32=#{@crc32} sha256=#{@sha256} for #{self.path}"
-          if @sha256.nil? || @crc32.nil? || force
-            buffer_size = 32768
-            buffer = Bytes.new(buffer_size)
-            # crc32 = CRC32.initial
-            crc32 = 0_u32
-            size = self.size.as(Int64)
-            path = self.path
-            last_time = Time.now
-            File.open(path) do |input|
-              io = OpenSSL::DigestIO.new(input, "SHA256")
-              progress = 0_u64
-              loop do
-                bytes = io.read(buffer)
-                break if bytes == 0
-                crc32 = CRC32.update(buffer[0, bytes], crc32)
-                progress += buffer_size
-                now = Time.now
-                if (size > 128 * 1024) && (now != last_time)
-                  STDERR.printf "\r%6.2f%% %s", 100.0 * progress / size, path
-                  STDERR.flush
-                  last_time = now
-                end
-              end
-              @sha256 = io.digest.hexstring
-              STDERR.printf "\r\e[K"
-            end
-            @crc32 = "%08x" % crc32
-            debug "crc32=#{@crc32} sha256=#{@sha256}"
+      def is_modified?
+        self.is_modified?(self.local_info)
+      rescue
+        nil
+      end
+
+      def is_modified?(info : File::Info)
+        if info.modification_time != @mtime || info.size != @size
+          true
+        else
+          false
+        end
+      end
+
+      def is_modified?(info : Nil)
+        nil
+      end
+
+      def can_checksum?(info : File::Info, hostname : String = @@hostname)
+        reason=""
+        if !self.filetype
+          reason="filetype must be defined"
+        elsif !self.filetype.is_a?(File::Type)
+          reason="filetype must be a File::Type"
+        else
+          filetype = self.filetype.as(File::Type)
+          if !filetype.file?
+            reason="filetype is '#{filetype.to_s}': can only checksum a file"
           end
+        end
+        debug "%s: %s", self.path.to_s, reason if !reason.empty?
+        { reason.empty?, reason }
+      end
+
+      def can_checksum?(hostname : String = @@hostname)
+        self.can_checksum?(info: self.local_info, hostname: hostname)
+      end
+
+      def calculate_checksums(checksum_mode : ChecksumMode, start_time = Time.local)
+        checksum_ok, reason = self.can_checksum?
+        if !self.filetype || !self.filetype.is_a?(File::Type)
+          raise "cannot checksum an entry without a filetype"
+        elsif !self.filetype.as(File::Type).file?
+          debug "%s: filetype is '%s': can only checksum a file", self.path.to_s, self.filetype.as(File::Type).to_s
+        elsif checksum_mode.never?
+          debug "%s: skipping checksum in NEVER mode", self.path.to_s
+        elsif checksum_mode.modified_only? && !self.is_modified?
+          debug "%s: skipping checksum in MODIFIED_ONLY mode, file not modified", self.path.to_s
+        else
+          if checksum_mode.modified_only?
+            debug "%s: calculating checksums in MODIFIED_ONLY mode, file was modified", self.path.to_s
+          else
+            debug "%s: calculating checksums in ALWAYS mode", self.path.to_s
+          end
+          debug "calculate_checksums(checksum_mode; #{checksum_mode}, start_time: #{start_time.inspect}) crc32=#{@crc32} sha256=#{@sha256} for #{self.path}"
+          buffer_size = 32768
+          buffer = Bytes.new(buffer_size)
+          crc32 = 0_u32
+          size = self.size.as(Int64)
+          path = self.path
+          last_time = Time.unix(0)
+          File.open(path) do |input|
+            io = OpenSSL::DigestIO.new(input, "SHA256")
+            progress = 0_u64
+            loop do
+              bytes = io.read(buffer)
+              break if bytes == 0
+              crc32 = CRC32.update(buffer[0, bytes], crc32)
+              progress += bytes
+              now = Time.local
+              if (size > 128 * 1024) && (now - last_time).abs.to_f >= 1.0
+                elapsed=now - start_time
+                if elapsed.days > 0
+                  duration=sprintf "%dd %02d:%02d:%02d", elapsed.days, elapsed.hours, elapsed.minutes, elapsed.seconds
+                else
+                  duration=sprintf "%02d:%02d:%02d", elapsed.hours, elapsed.minutes, elapsed.seconds
+                end
+                STDERR.printf "\r%s %6.2f%% %s", duration, 100.0 * progress / size, path.to_s.size > 130 ? path.to_s[0,137] + "..." : path
+                STDERR.flush
+                last_time = now
+              end
+            end
+            @sha256 = io.digest.hexstring
+            elapsed=Time.local - start_time
+            if elapsed.days > 0
+              duration=sprintf "%dd %02d:%02d:%02d", elapsed.days, elapsed.hours, elapsed.minutes, elapsed.seconds
+            else
+              duration=sprintf "%02d:%02d:%02d", elapsed.hours, elapsed.minutes, elapsed.seconds
+            end
+            STDERR.printf "\r%s %6.2f%% %s\n", duration, 100.0, path.to_s.size > 130 ? path.to_s[0,137] + "..." : path
+          end
+          @crc32 = "%08x" % crc32
+          debug "crc32=#{@crc32} sha256=#{@sha256}"
         end
       end
 
       def sha256
-        if @sha256.nil?
-          self.calculate_checksums
-          @sha256
+        raise "not a file" unless self.filetype && self.filetype.as(File::Type).file?
+        raise "no checksum" unless @sha256
+        @sha256
+      end
+
+      def sha256?
+        @sha256
+      end
+
+      def sha256!(checksum_mode : File::Index::ChecksumMode = File::Index::ChecksumMode::ALWAYS, start_time : Time = Time.local)
+        if !@sha256
+          self.calculate_checksums(checksum_mode: checksum_mode, start_time: start_time)
         end
+        @sha256
       end
 
       def crc32
-        if @crc32.nil?
-          self.calculate_checksums
+        raise "not a file" unless self.filetype && self.filetype.as(File::Type).file?
+        raise "no checksum" unless @crc32
+        @crc32
+      end
+
+      def crc32?
+        @crc32
+      end
+
+      def crc32!(checksum_mode : File::Index::ChecksumMode = File::Index::ChecksumMode::ALWAYS, start_time : Time = Time.local)
+        if !@crc32
+          self.calculate_checksums(checksum_mode: checksum_mode, start_time: start_time)
         end
         @crc32
       end
 
-      def to_json
-        String.build do |str|
-          to_json str
+      def self.properties(which : Symbol = :without_id)
+        case which
+        when :without_id
+          @@properties
+        when :all
+          @@properties_all
+        when :required, :mandatory
+          @@properties_required
+        else
+          raise "#{which.to_s}: unknown property set"
         end
       end
     end

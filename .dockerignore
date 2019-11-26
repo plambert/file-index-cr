@@ -1,0 +1,9 @@
+Dockerfile
+LICENSE
+README.md
+bin
+dev
+*.out
+shard.lock
+test-*
+*.sqlite3
