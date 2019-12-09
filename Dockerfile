@@ -6,7 +6,6 @@ WORKDIR /opt/file-index-cr
 ADD src /opt/file-index-cr/src
 ADD spec /opt/file-index-cr/spec
 ADD lib /opt/file-index-cr/lib
-ADD docs /opt/file-index-cr/docs
 ADD shard.yml /opt/file-index-cr/shard.yml
 
 RUN shards build file-index

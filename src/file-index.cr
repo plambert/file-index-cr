@@ -154,7 +154,6 @@ class CLI < Admiral::Command
   def run
     puts help
   end
-
 end
 
 CLI.run
