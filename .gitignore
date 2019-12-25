@@ -6,4 +6,3 @@
 *.out
 *.sqlite3
 /test-*/
-shard.lock
