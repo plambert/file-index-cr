@@ -116,14 +116,14 @@ class File
       self.add(path.to_s, checksum_mode: checksum_mode, hostname: hostname)
     end
 
-    def add(path : String, checksum_mode : ChecksumMode = @default_checksum_mode, hostname : String = @hostname)
+    def add(path : String, checksum_mode : ChecksumMode = @default_checksum_mode, hostname : String = @hostname, start_time = Time.local)
       debug "add(#{path.inspect}, checksum_mode: #{checksum_mode}, hostname: #{hostname.inspect})"
       entries = [] of File::Index::Entry
       queue = Deque(String).new(1000)
       queue.push path
       while queue.size > 0
         path = queue.shift
-        entry = self.add_one path: path, checksum_mode: checksum_mode, hostname: hostname
+        entry = self.add_one path: path, checksum_mode: checksum_mode, hostname: hostname, start_time: start_time
         entries << entry
         if entry.directory?
           Dir.children(path).each { |c| queue << "#{path}/#{c}" }
@@ -132,9 +132,9 @@ class File
       entries
     end
 
-    def add_one(path : String, checksum_mode : ChecksumMode = @default_checksum_mode, hostname : String = @hostname)
+    def add_one(path : String, checksum_mode : ChecksumMode = @default_checksum_mode, hostname : String = @hostname, start_time = Time.local)
       debug "add_one(#{path.inspect}, checksum_mode: #{checksum_mode}, hostname: #{hostname.inspect})"
-      self.new_from_filesystem path: path, checksum_mode: checksum_mode, hostname: hostname
+      self.new_from_filesystem path: path, checksum_mode: checksum_mode, hostname: hostname, start_time: start_time
     end
 
     def all

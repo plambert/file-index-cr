@@ -39,6 +39,7 @@ class CLI < Admiral::Command
       verbose = parent.flags.as(CLI::Flags).verbose
       checksum_mode = File::Index::ChecksumMode.for always_checksum: parent.flags.as(CLI::Flags).always_checksum, update_checksum: parent.flags.as(CLI::Flags).update_checksum
       loglevel verbose ? File::Index::Logger::LogLevel::DEBUG : File::Index::Logger::LogLevel::INFO
+      start_time=Time.local
       unless File.file? dbfile
         error "%s: file-index database does not exist, use \`%s create\` to create it" % [dbfile, PROGRAM_NAME]
         exit 1
@@ -46,7 +47,7 @@ class CLI < Admiral::Command
       index = File::Index.new dbfile: dbfile
 
       if arguments.size > 0
-        arguments.each { |a| index.add a, checksum_mode: checksum_mode }
+        arguments.each { |a| index.add a, checksum_mode: checksum_mode, start_time: start_time }
       else
         index.add ".", checksum_mode: checksum_mode
       end
