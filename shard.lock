@@ -1,12 +1,12 @@
 version: 1.0
 shards:
-  admiral:
-    github: jwaldrip/admiral.cr
-    version: 1.9.0
-
   db:
     github: crystal-lang/crystal-db
     version: 0.8.0
+
+  phreak:
+    github: shinzlet/phreak
+    commit: b6642f86856d32e0795dce902d57ffc5acbb5396
 
   sqlite3:
     github: crystal-lang/crystal-sqlite3
