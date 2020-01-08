@@ -21,7 +21,7 @@ class File
     end
 
     def find(where : String? = nil, *args, limit : Int? = nil)
-      debug "find(#{where}, #{args}) do ... end"
+      debug "find(#{where.inspect}, #{args}) do ... end"
       raise "#{limit}: limit must be a positive, non-zero integer" if limit && limit < 1
       sql_command = String.build(200_i32 + (where ? where.size : 0)) do |str|
         str << "SELECT \"id\", #{File::Index::Entry.properties.map { |p| "\"#{p}\"" }.join(", ")} FROM entry"
@@ -43,7 +43,7 @@ class File
     end
 
     def find(where : String? = nil, *args, limit : Int? = nil) : Array(File::Index::Entry)
-      debug "find(#{where}, #{args})"
+      debug "find(#{where.inspect}, #{args})"
       list = [] of File::Index::Entry
       self.find(where, *args, limit: limit) { |entry| list << entry }
       list
@@ -95,7 +95,9 @@ class File
     end
 
     def []?(path : Path | String)
-      self.by_path?(path: path, hostname: @hostname)
+      self.by_path(path: path, hostname: @hostname)
+    rescue
+      nil
     end
 
     def add(path : Path, checksum_mode : ChecksumMode = @default_checksum_mode, hostname : String = @hostname)

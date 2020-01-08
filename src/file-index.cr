@@ -226,6 +226,7 @@ class CLI
     #     puts root
     #   end
 
+<<<<<<< HEAD
     #   root.bind short_flag: 'f', long_flag: "dbfile", description: "The database file to use" do
     #     @dbfile = root.next_token
     #   end
@@ -233,6 +234,37 @@ class CLI
     #   root.bind short_flag: 'c', long_flag: "checksum", description: "Always checksum files" do
     #     @checksum = true
     #   end
+=======
+    def run
+      dbfile = parent.flags.as(CLI::Flags).dbfile
+      verbose = parent.flags.as(CLI::Flags).verbose
+      loglevel verbose ? File::Index::Logger::LogLevel::DEBUG : File::Index::Logger::LogLevel::INFO
+      unless File.file? dbfile
+        error "%s: file-index database does not exist, use \`%s create\` to create it" % [dbfile, PROGRAM_NAME]
+        exit 1
+      end
+      index = File::Index.new dbfile: dbfile
+
+      if arguments.size > 0
+        arguments.each do |a|
+          entry = index[a]?
+          if entry
+            puts entry.to_json
+          else
+            STDERR.puts "#{a}: not found in index"
+          end
+        end
+      else
+        raise "expected at least one file or directory argument"
+      end
+    end
+  end
+
+  register_sub_command search, Search
+
+  class Update < Admiral::Command
+    define_help description: "Update the file-index database (NOT IMPLEMENTED)"
+>>>>>>> e3082876087d512f92150ab09038c3c89d6af6ea
 
     #   root.bind long_flag: "no-checksum", description: "Do not checksum files" do
     #     @checksum = false
