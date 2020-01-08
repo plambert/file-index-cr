@@ -123,7 +123,7 @@ class File
         @group = System::Group.find_by(id: info.group.to_s).name
         @updated_at = Time.utc
         @created_at = self.updated_at if self.created_at.nil?
-        @link_target=File.readlink(self.path.to_s) if info.symlink?
+        @link_target = File.readlink(self.path.to_s) if info.symlink?
         self.update(db)
       end
 
@@ -257,6 +257,7 @@ class File
       end
 
       def is_modified?(info : File::Info)
+        debug "is_modified?(info: %s)", info.inspect
         if info.modification_time != @mtime || info.size != @size
           true
         else
@@ -269,19 +270,19 @@ class File
       end
 
       def can_checksum?(info : File::Info, hostname : String = @@hostname)
-        reason=""
+        reason = ""
         if !self.filetype
-          reason="filetype must be defined"
+          reason = "filetype must be defined"
         elsif !self.filetype.is_a?(File::Type)
-          reason="filetype must be a File::Type"
+          reason = "filetype must be a File::Type"
         else
           filetype = self.filetype.as(File::Type)
           if !filetype.file?
-            reason="filetype is '#{filetype.to_s}': can only checksum a file"
+            reason = "filetype is '#{filetype.to_s}': can only checksum a file"
           end
         end
         debug "%s: %s", self.path.to_s, reason if !reason.empty?
-        { reason.empty?, reason }
+        {reason.empty?, reason}
       end
 
       def can_checksum?(hostname : String = @@hostname)
@@ -321,25 +322,25 @@ class File
               progress += bytes
               now = Time.local
               if (size > 128 * 1024) && (now - last_time).abs.to_f >= 1.0
-                elapsed=now - start_time
+                elapsed = now - start_time
                 if elapsed.days > 0
-                  duration=sprintf "%dd %02d:%02d:%02d", elapsed.days, elapsed.hours, elapsed.minutes, elapsed.seconds
+                  duration = sprintf "%dd %02d:%02d:%02d", elapsed.days, elapsed.hours, elapsed.minutes, elapsed.seconds
                 else
-                  duration=sprintf "%02d:%02d:%02d", elapsed.hours, elapsed.minutes, elapsed.seconds
+                  duration = sprintf "%02d:%02d:%02d", elapsed.hours, elapsed.minutes, elapsed.seconds
                 end
-                STDERR.printf "\r%s %6.2f%% %s", duration, 100.0 * progress / size, path.to_s.size > 130 ? path.to_s[0,137] + "..." : path
+                STDERR.printf "\r%s %6.2f%% %s", duration, 100.0 * progress / size, path.to_s.size > 130 ? path.to_s[0, 137] + "..." : path
                 STDERR.flush
                 last_time = now
               end
             end
             @sha256 = io.digest.hexstring
-            elapsed=Time.local - start_time
+            elapsed = Time.local - start_time
             if elapsed.days > 0
-              duration=sprintf "%dd %02d:%02d:%02d", elapsed.days, elapsed.hours, elapsed.minutes, elapsed.seconds
+              duration = sprintf "%dd %02d:%02d:%02d", elapsed.days, elapsed.hours, elapsed.minutes, elapsed.seconds
             else
-              duration=sprintf "%02d:%02d:%02d", elapsed.hours, elapsed.minutes, elapsed.seconds
+              duration = sprintf "%02d:%02d:%02d", elapsed.hours, elapsed.minutes, elapsed.seconds
             end
-            STDERR.printf "\r%s %6.2f%% %s\n", duration, 100.0, path.to_s.size > 130 ? path.to_s[0,137] + "..." : path
+            STDERR.printf "\r%s %6.2f%% %s\n", duration, 100.0, path.to_s.size > 130 ? path.to_s[0, 137] + "..." : path
           end
           @crc32 = "%08x" % crc32
           debug "crc32=#{@crc32} sha256=#{@sha256}"

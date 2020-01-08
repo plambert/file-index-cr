@@ -10,7 +10,7 @@ class CLI < Admiral::Command
   define_help description: "Manage SQLite database index of file metadata"
   define_flag dbfile : String,
     description: "The database file to use",
-    default: Path[ENV["FILE_INDEX_DBFILE"]? || "~/.cache/file-index-cr.sqlite3"].expand.to_s,
+    default: Path[ENV["FILE_INDEX_DBFILE"]? || "#{ENV["HOME"]}/.cache/file-index-cr.sqlite3"].expand.to_s,
     long: dbfile,
     short: f,
     required: true
@@ -22,7 +22,7 @@ class CLI < Admiral::Command
     required: true
   define_flag always_checksum : Bool,
     description: "Always recalculate checksums",
-    default: true,
+    default: false,
     long: checksum,
     short: c
   define_flag update_checksum : Bool,
@@ -39,22 +39,23 @@ class CLI < Admiral::Command
       verbose = parent.flags.as(CLI::Flags).verbose
       checksum_mode = File::Index::ChecksumMode.for always_checksum: parent.flags.as(CLI::Flags).always_checksum, update_checksum: parent.flags.as(CLI::Flags).update_checksum
       loglevel verbose ? File::Index::Logger::LogLevel::DEBUG : File::Index::Logger::LogLevel::INFO
-      start_time=Time.local
+      start_time = Time.local
       unless File.file? dbfile
         error "%s: file-index database does not exist, use \`%s create\` to create it" % [dbfile, PROGRAM_NAME]
         exit 1
       end
       index = File::Index.new dbfile: dbfile
+      list = [] of File::Index::Entry
 
       if arguments.size > 0
-        arguments.each { |a| index.add a, checksum_mode: checksum_mode, start_time: start_time }
+        arguments.each { |a| list += index.add a, checksum_mode: checksum_mode, start_time: start_time }
       else
-        index.add ".", checksum_mode: checksum_mode
+        list += index.add ".", checksum_mode: checksum_mode
       end
 
-      info "indexing complete"
+      info "added %d entries", list.size.to_s
 
-      index.all.each do |entry|
+      list.each do |entry|
         puts entry.to_json
       end
     end
@@ -117,18 +118,19 @@ class CLI < Admiral::Command
         exit 1
       end
       index = File::Index.new dbfile: dbfile
+      list = [] of File::Index::Entry
 
       if arguments.size > 0
         arguments.each do |a|
-          index.add a, checksum_mode: checksum_mode
+          list += index.add a, checksum_mode: checksum_mode
         end
       else
-        index.add ".", checksum_mode: checksum_mode
+        list += index.add ".", checksum_mode: checksum_mode
       end
 
-      info "indexing complete"
+      info "%d entries added", list.size.to_s
 
-      index.all.each do |entry|
+      list.each do |entry|
         puts entry.to_json
       end
     end
@@ -140,9 +142,31 @@ class CLI < Admiral::Command
     define_help description: "Search the file-index database (NOT IMPLEMENTED)"
 
     def run
-      raise "Not implemented"
+      dbfile = parent.flags.as(CLI::Flags).dbfile
+      verbose = parent.flags.as(CLI::Flags).verbose
+      loglevel verbose ? File::Index::Logger::LogLevel::DEBUG : File::Index::Logger::LogLevel::INFO
+      unless File.file? dbfile
+        error "%s: file-index database does not exist, use \`%s create\` to create it" % [dbfile, PROGRAM_NAME]
+        exit 1
+      end
+      index = File::Index.new dbfile: dbfile
+
+      if arguments.size > 0
+        arguments.each do |a|
+          entry = index[a]?
+          if entry
+            puts entry.to_json
+          else
+            STDERR.puts "#{a}: not found in index"
+          end
+        end
+      else
+        raise "expected at least one file or directory argument"
+      end
     end
   end
+
+  register_sub_command search, Search
 
   class Update < Admiral::Command
     define_help description: "Update the file-index database (NOT IMPLEMENTED)"
