@@ -1,6 +1,3 @@
-# require "phreak"
-# require "./file/**"
-
 class CLI
   class Args
     alias ArgsType = Array(String)
