@@ -41,7 +41,7 @@ class CLI < Admiral::Command
       loglevel verbose ? File::Index::Logger::LogLevel::DEBUG : File::Index::Logger::LogLevel::INFO
       start_time = Time.local
       unless File.file? dbfile
-        error "%s: file-index database does not exist, use \`%s create\` to create it" % [dbfile, PROGRAM_NAME]
+        error "%s: file-index database does not exist, use `%s create` to create it" % [dbfile, PROGRAM_NAME]
         exit 1
       end
       index = File::Index.new dbfile: dbfile
@@ -50,7 +50,7 @@ class CLI < Admiral::Command
       if arguments.size > 0
         arguments.each { |a| list += index.add a, checksum_mode: checksum_mode, start_time: start_time }
       else
-        list += index.add ".", checksum_mode: checksum_mode
+        list += index.add ".", checksum_mode: checksum_mode, start_time: start_time
       end
 
       info "added %d entries", list.size.to_s
@@ -114,7 +114,7 @@ class CLI < Admiral::Command
       checksum_mode = File::Index::ChecksumMode.for always_checksum: parent.flags.as(CLI::Flags).always_checksum, update_checksum: parent.flags.as(CLI::Flags).update_checksum
       loglevel verbose ? File::Index::Logger::LogLevel::DEBUG : File::Index::Logger::LogLevel::INFO
       unless File.file? dbfile
-        error "%s: file-index database does not exist, use \`%s create\` to create it" % [dbfile, PROGRAM_NAME]
+        error "%s: file-index database does not exist, use `%s create` to create it" % [dbfile, PROGRAM_NAME]
         exit 1
       end
       index = File::Index.new dbfile: dbfile
@@ -146,7 +146,7 @@ class CLI < Admiral::Command
       verbose = parent.flags.as(CLI::Flags).verbose
       loglevel verbose ? File::Index::Logger::LogLevel::DEBUG : File::Index::Logger::LogLevel::INFO
       unless File.file? dbfile
-        error "%s: file-index database does not exist, use \`%s create\` to create it" % [dbfile, PROGRAM_NAME]
+        error "%s: file-index database does not exist, use `%s create` to create it" % [dbfile, PROGRAM_NAME]
         exit 1
       end
       index = File::Index.new dbfile: dbfile

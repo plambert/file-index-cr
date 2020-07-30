@@ -144,7 +144,7 @@ class File
             result = db.exec(sql_command, @hostname, @dir, @name, @dev, @inode, @size, @permissions.value.to_i64,
               @filetype.to_s, @flags.to_s, @mtime.as(Time).to_unix, @uid, @owner, @gid, @group, @created_at.as(Time).to_unix, @updated_at.as(Time).to_unix, @crc32, @sha256, @link_target)
           rescue e : SQLite3::Exception
-            fail 9, "INSERT failed:\n%s\n%s\n", self.inspect, e.to_s
+            fail 9, "INSERT failed:\n%s\n%s\n", self.inspect, e.inspect
           end
           @id = result.last_insert_id.as(Int64)
         else
