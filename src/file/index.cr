@@ -100,9 +100,13 @@ class File
 
     def by_path(path : Path | String, hostname : String = @hostname)
       debug "by_path(#{path.inspect}, #{hostname.inspect})"
-      dirname = File.dirname path.to_s
-      basename = File.basename path.to_s
-      self.find_one("hostname=? AND dir=? AND name=?", hostname, dirname, basename)
+      if path.to_s == "/"
+        self[0]
+      else
+        dirname = File.dirname path.to_s
+        basename = File.basename path.to_s
+        self.find_one("hostname=? AND dir=? AND name=?", hostname, dirname, basename)
+      end
     end
 
     def [](path : Path | String)
